@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Brief 契约",
+  "description": "本地/云端文本 Provider 输出的统一结构。UI 与存储只消费 Brief，不读取供应商原始响应。",
+  "type": "object",
+  "required": ["display", "parse_ok"],
+  "properties": {
+    "display": {
+      "type": "string",
+      "description": "面向气泡的短简报，无标题，≤120 个中文字符",
+      "maxLength": 120
+    },
+    "key_points": { "type": "array", "items": { "type": "string" } },
+    "todos": { "type": "array", "items": { "type": "string" } },
+    "decisions": { "type": "array", "items": { "type": "string" } },
+    "entities": { "type": "array", "items": { "type": "string" } },
+    "detail": { "type": "string", "description": "仅会议/长内容生成的结构化详细纪要" },
+    "insight": { "type": "string", "description": "仅 auto 使用的一句可追溯建议" },
+    "source_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "必须指向确实存在的 OCR 行或字幕片段，由程序分配 ID"
+    },
+    "provider": { "type": "string", "enum": ["LocalLlama", "OpenAiCompatibleText", "LocalWhisper", "WindowsSpeech", "OpenAiCompatibleASR"] },
+    "parse_ok": { "type": "boolean" }
+  }
+}

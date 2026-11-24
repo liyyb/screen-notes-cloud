@@ -1,0 +1,34 @@
+{
+  "name": "screen-notes",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "屏幕笔记 · 页面陪伴与实时字幕",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "runtime": "node runtime/server.mjs",
+    "selftest": "node runtime/cli.mjs selftest",
+    "test:contract": "node scripts/contract-test.mjs",
+    "test:migration": "node scripts/migration-test.mjs",
+    "test:speech": "node scripts/speech-test.mjs",
+    "test:companion": "node --no-warnings scripts/companion-test.mjs",
+    "test:reading": "node --no-warnings scripts/reading-test.mjs",
+    "test:reliability": "node --no-warnings scripts/companion-reliability-test.mjs",
+    "test:reading-pages": "node --no-warnings scripts/reading-pages-test.mjs",
+    "test:stage4": "node --no-warnings scripts/stage4-test.mjs",
+    "test:caption-controller": "node --no-warnings scripts/caption-controller-test.mjs"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tauri-apps/cli": "^2.2.7",
+    "svelte": "^5.19.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-global-shortcut": "^2.2.0"
+  }
+}

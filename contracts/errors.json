@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "屏幕笔记错误码契约",
+  "description": "Node 与 Rust 后端必须返回一致的稳定错误码。HTTP/JSON-RPC 层以 { error: { code, message } } 或 { error: string } 呈现，code 取自此表。",
+  "type": "object",
+  "properties": {
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "message", "retryable"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "retryable": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}
