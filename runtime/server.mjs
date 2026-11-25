@@ -2,21 +2,16 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { ScreenNotesCore } from './core.mjs';
+import { root, preferredPort, portRange, identity } from './instance.mjs';
+import { openMainWindow } from './open-main.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = path.join(root, 'dist');
-const preferredPort = Number(
-  process.env.SCREEN_NOTES_PORT ??
-    (process.argv.includes('--port') ? process.argv[process.argv.indexOf('--port') + 1] : 17860)
-);
 
 /** Bind the first free port starting at `start`, so an occupied port never aborts startup. */
 export async function listenWithFallback(server, start) {
   let lastError;
-  for (let p = start; p < start + 20; p++) {
+  for (let p = start; p < start + portRange; p++) {
     try {
       await new Promise((resolve, reject) => {
         const onError = (e) => {
@@ -107,7 +102,7 @@ export async function startServer({ open = false } = {}) {
       });
       return;
     }
-    if (req.method === 'GET' && url === '/api/_health') return sendJson(res, 200, { data: { ok: true, backend: 'node', runtime_version: 'captions-20261118' } });
+    if (req.method === 'GET' && url === '/api/_health') return sendJson(res, 200, { data: { ok: true, backend: 'node', shell: wantShell, ...identity } });
     // 图片资产静态服务：只允许 data/assets/ 内的相对路径，防路径穿越。
     if (req.method === 'GET' && url.startsWith('/api/asset')) {
       const q = new URL(url, 'http://localhost').searchParams.get('path') ?? '';
@@ -173,17 +168,8 @@ export async function startServer({ open = false } = {}) {
   }
 
   if (open && process.env.SCREEN_NOTES_NO_OPEN !== '1') {
-    const url = `http://127.0.0.1:${port}`;
-    const candidates = [
-      path.join(process.env['ProgramFiles(x86)'] ?? '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-      path.join(process.env.ProgramFiles ?? '', 'Microsoft', 'Edge', 'Application', 'msedge.exe')
-    ];
-    const edge = candidates.find((p) => p && fs.existsSync(p));
-    if (edge) {
-      spawn(edge, [`--app=${url}`, `--window-size=1200,800`], { stdio: 'ignore', detached: true }).unref();
-    } else {
-      spawn('cmd.exe', ['/c', 'start', '', url], { stdio: 'ignore', detached: true }).unref();
-    }
+    if (wantShell) core.queueShellCommand({ type: 'open_main' });
+    else openMainWindow(port);
   }
   return { server, core, port, shellProc };
 }

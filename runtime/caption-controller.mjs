@@ -9,7 +9,7 @@ export class CaptionController {
     this.events=new CaptionEvents(session.id);this.next=0;this.commitNext=0;
     this.pending=[];this.running=0;this.retainedMs=0;this.completed=new Map();
     this.failed=new Map();this.waiters=[];this.accepting=true;this.cancelled=false;
-    this.lostSegments=0;this.abort=new AbortController();this.samples=[];this.queuedAudioMs=0;
+    this.lostSegments=0;this.abort=new AbortController();this.samples=[];this.queuedAudioMs=0;this.requestCount=0;
   }
   enqueue(segment) {
     if(!this.accepting||this.cancelled)return;
@@ -37,6 +37,7 @@ export class CaptionController {
     const started=this.now();let result,error;
     this.firstSubmitAt ??= Date.now();
     for(let attempt=0;attempt<2;attempt++) {
+      this.requestCount++;
       try { result=await this.provider.transcribe(job.pcm,{...job,signal:this.abort.signal});error=null;break; }
       catch(e){error=e;const code=e.httpStatus;const recoverable=code===429||code>=500||(!code&&/timeout|fetch|network|网络|超时/i.test(e.message));
         if(code===429)this.concurrency=1;

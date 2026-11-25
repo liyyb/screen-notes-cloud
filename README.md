@@ -1,19 +1,19 @@
-# 屏幕笔记-cloud
+# 屏幕笔记 Cloud
+
+Windows 屏幕截图笔记，支持 OCR、页面陪伴、笔记库和实时字幕。
 
 ## 下载体验
 
-从 [GitHub Releases](../../releases) 下载 `screen-notes-cloud-windows.zip` 并完整解压。双击启动屏幕笔记.bat。文本摘要和云端转写需要自行配置对应 API，基础截图与 OCR 可本机运行。
+从 [GitHub Releases](https://github.com/liyyb/screen-notes-cloud/releases/latest) 下载 `screen-notes-cloud-v0.2.0-windows.zip`，完整解压后双击 `启动屏幕笔记.bat`。适用于 Windows 10/11 x64。中文 OCR 需系统安装对应语言包，笔记库使用系统 WebView2 Runtime。
 
-源码仓库使用系统 Node.js，体验包自带便携 Node。音频采集辅件以二进制随项目提供。
+体验包内置中文流式字幕组件，可在设置中切换云端转写。云端功能使用你自行填写的 API 配置。文本 API 未配置时，手动截图仍可使用 OCR 和抽取式摘要。
 
+- 点击悬浮窗的「记录」或按 Ctrl+Alt+N 保存截图笔记。
+- 双击悬浮窗或托盘图标打开笔记库，可分区、检索与导出。
+- 使用托盘菜单退出后台服务。用户数据在运行后写入项目的 `data/`。
 
-适用于 Windows 10/11 x64。解压整个目录后，双击 `启动屏幕笔记.bat`。已附带 Node 与构建好的界面，体验时无需 npm 安装。Windows 中文 OCR 需对应系统语言包。
+## 源码开发
 
-- 「记录」可截屏、生成摘要并保存到分区。双击小窗或托盘图标可打开笔记库。
-- 在设置中分别填写文本与云端语音 API 的地址、模型和自己的密钥。未配置文本接口时，截图笔记可使用本机 OCR 和抽取式摘要。
-- 字幕可选系统声音或默认麦克风。云端字幕使用单独的 ASR 配置。需要离线字幕时，可在设置中在线安装可选的本地实时组件，安装完成后切换到本地实时。
-- 数据在首次运行时创建于本项目的 `data`。退出时使用托盘菜单「退出屏幕笔记」。
+使用支持 `node:sqlite` 的 Node.js（建议 22.13 或更新版本）。执行 `npm ci` 和 `npm run build` 后双击启动脚本。音频采集辅件和 WebView2 SDK 组件随源码提供，便携 Node 和本地语音模型随体验包提供。需要本地字幕时，可在设置中安装所需组件。
 
-需要开发时，运行 `npm ci` 和 `npm run build`。运行自检可使用 `runtime\node\node.exe runtime\cli.mjs selftest`。界面里的「使用检查」可分别检查 OCR、API 和音源。
-
-未填写文本密钥时，自检会把云端健康检查、云端推理和需要云端回复的收藏验证标记为跳过。
+执行 `npm run test:contract` 和 `npm run test:migration` 验证接口契约与数据库迁移。

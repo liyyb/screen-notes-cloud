@@ -375,13 +375,13 @@ export class CaptionSession {
       this.db.db.prepare('UPDATE transcripts SET note_id = ? WHERE session_id = ? AND is_final = 1 AND (? = 0 OR selected = 1)').run(noteId, this.id, strategy === 'selected' ? 1 : 0);
       this.db.db.prepare('UPDATE caption_sessions SET status = ?, ended_at = ? WHERE id = ?')
         .run(strategy === 'selected' ? 'saved_selected' : 'saved_full', now, this.id);
+      this.db.syncFts(noteId);
       this.db.db.exec('COMMIT');
     } catch (e) {
       this.db.db.exec('ROLLBACK');
       throw e;
     }
     const note = this.db.get(noteId);
-    this.db.syncFts(noteId, '', (rows[0]?.text ?? '').slice(0, 120), fullText);
     return { session_id: this.id, status: strategy === 'selected' ? 'saved_selected' : 'saved_full', note_id: noteId, note };
   }
 

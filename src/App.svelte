@@ -5,6 +5,15 @@
   import { backendName } from './lib/transport';
   import type { AppStatus, CaptureScope, Note, ProviderStatus, Section, SelftestReport, Settings, ShellState, Stats, SectionRow, Draft } from './lib/types';
 
+  const desktop = window as Window & {
+    __SCREEN_NOTES_DESKTOP__?: boolean;
+    chrome?: { webview?: EventTarget & { postMessage: (message: string) => void } };
+  };
+  const windowBridge = desktop.__SCREEN_NOTES_DESKTOP__ ? desktop.chrome?.webview : undefined;
+  let maximized = false;
+  function updateWindowState(event: Event) {
+    maximized = (event as MessageEvent).data === 'maximized';
+  }
   let notes: Note[] = [];
   let sections: Section[] = [];
   let sectionRows: SectionRow[] = [];
@@ -473,6 +482,8 @@
   }
 
   onMount(() => {
+    windowBridge?.addEventListener('message', updateWindowState);
+    windowBridge?.postMessage('window-state');
     refreshNotes(false);
     refreshSections();
     refreshStatus();
@@ -480,6 +491,7 @@
     pollTimer = setInterval(refreshStatus, 1200);
   });
   onDestroy(() => {
+    windowBridge?.removeEventListener('message', updateWindowState);
     if (pollTimer) clearInterval(pollTimer);
     if (toastTimer) clearTimeout(toastTimer);
     if (searchTimer) clearTimeout(searchTimer);
@@ -487,7 +499,7 @@
 </script>
 
 <div class="app">
-  <header class="topbar">
+  <header class="topbar" class:desktop-bar={!!windowBridge}>
     <div class="brand">
       <span class="mark">屏</span>
       <span class="name">屏幕笔记</span>
@@ -524,10 +536,26 @@
     </button>
     <div class="chip" title={provider.detail}>
       <span class="dot {providerDot}"></span>
-      {provider.state === 'ready' ? '模型就绪' : provider.state === 'loading' ? '加载中' : provider.state === 'error' ? '模型异常' : '模型待命'}
+      <span class="model-label">{provider.state === 'ready' ? '模型就绪' : provider.state === 'loading' ? '加载中' : provider.state === 'error' ? '模型异常' : '模型待命'}</span>
     </div>
     <button class="icon" on:click={runSelftest} title="全链路自检">✓</button>
     <button class="icon" on:click={openSettings} title="设置">⚙</button>
+    {#if windowBridge}
+      <div class="window-controls" role="group" aria-label="窗口操作">
+        <button type="button" aria-label="最小化" title="最小化" on:click={() => windowBridge.postMessage('minimize')}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5h9"/></svg>
+        </button>
+        <button type="button" aria-label={maximized ? '还原窗口' : '最大化'} title={maximized ? '还原窗口' : '最大化'} on:click={() => windowBridge.postMessage('maximize')}>
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            {#if maximized}<path d="M6 5V3.5h6.5V10H11"/><rect x="3.5" y="6" width="7" height="7"/>
+            {:else}<rect x="3.5" y="3.5" width="9" height="9"/>{/if}
+          </svg>
+        </button>
+        <button type="button" class="window-close" aria-label="关闭笔记库" title="关闭笔记库" on:click={() => windowBridge.postMessage('close')}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8m0-8-8 8"/></svg>
+        </button>
+      </div>
+    {/if}
   </header>
 
   <section class="companion-panel" aria-label="页面陪伴" aria-live="polite">

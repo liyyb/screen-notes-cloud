@@ -23,12 +23,13 @@ if not exist "%~dp0dist\index.html" (
 
 REM Reuse an existing instance; never start a second copy of the hotkey/model service.
 "%NODE_EXE%" --no-warnings runtime\check-running.mjs
+if errorlevel 2 goto :fail
 if not errorlevel 1 goto :eof
 
 REM Default: a small always-on-top panel in the top-right corner, manual mode.
 REM Double-click the tray icon (or the panel) to open the full notes window.
 echo Starting Screen Notes ... ^(close this window to stop^)
-"%NODE_EXE%" --no-warnings runtime\server.mjs --port 17860 --shell
+"%NODE_EXE%" --no-warnings runtime\server.mjs --shell
 if errorlevel 1 (
   echo.
   echo [ERROR] Failed to start. See the message above.

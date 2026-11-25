@@ -712,6 +712,7 @@ export class ScreenNotesCore {
         return JSON.parse(JSON.stringify(this.settings));
       }
       case 'shell_poll': return { commands: this.shellQueue.splice(0), state: this.shellState() };
+      case 'open_main_window': this.queueShellCommand({ type: 'open_main' }); return true;
       case 'get_shell_state': return this.shellState();
       case 'set_capture_scope': {
         const scope = String(args.scope ?? '');
@@ -1311,8 +1312,6 @@ export class ScreenNotesCore {
     // changes the next launch (e.g. leaving capture_scope = rect, which makes
     // every later capture wait for a manual drag selection).
     const settingsBefore = JSON.parse(JSON.stringify(this.settings));
-    const cloudUnconfigured = this.settings.provider === 'OpenAiCompatible'
-      && !this.settings.api_config.api_key;
     const check = async (name, fn) => {
       const start = Date.now();
       try {
@@ -1368,7 +1367,6 @@ export class ScreenNotesCore {
     });
 
     await check('提供方健康检查', async () => {
-      if (cloudUnconfigured) return '未配置文本 API Key，跳过云端检查；截图使用抽取式摘要';
       const a = await this.provider.ensureStarted();
       const health = await this.provider.healthCheck();
       if (!health.ok) throw new Error(health.detail);
@@ -1435,7 +1433,6 @@ export class ScreenNotesCore {
     });
 
     await check('陪伴灵感不自动保存、主动收藏幂等', async () => {
-      if (cloudUnconfigured) return '未配置文本 API Key，跳过需要云端回应的收藏自检';
       const before = this.db.count();
       const fg = { process: 'browser', title: '屏幕笔记项目讨论 - 浏览器' };
       if (this.isSelfForeground(fg)) throw new Error('项目名导致前台误判');

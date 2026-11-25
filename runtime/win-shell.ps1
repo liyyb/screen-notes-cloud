@@ -19,6 +19,7 @@ Add-Type -AssemblyName System.Windows.Forms
 . (Join-Path $PSScriptRoot 'caption-layout.ps1')
 . (Join-Path $PSScriptRoot 'mini-icons.ps1')
 . (Join-Path $PSScriptRoot 'desktop-layout.ps1')
+. (Join-Path $PSScriptRoot 'main-window.ps1')
 # HttpClient is used for the non-blocking capture_process call so the WinForms
 # message pump keeps running (the three dots must actually animate for 2-3 s).
 $script:httpPumpAvailable = $true
@@ -284,7 +285,7 @@ function Hide-Self {
   try { if ($script:bubble -and $script:bubble.Visible) { $script:bubble.Hide() } } catch { }
   try { if ($script:mini -and $script:mini.Visible) { $script:mini.Hide() } } catch { }
   $script:hidden.Clear()
-  # The main notes window (Edge --app) has this exact title; hide it too.
+  # Hide the main notes window for screen captures as well.
   try {
     foreach ($h in [SNNative]::FindByTitle('屏幕笔记 · 笔记库')) {
       if ($h -ne $script:mini.Handle) {
@@ -307,26 +308,17 @@ function Show-Self {
 
 function Open-Main {
   try {
-    $wins = [SNNative]::FindByTitle('屏幕笔记 · 笔记库')
-    foreach ($h in $wins) {
-      if ($h -ne $script:mini.Handle) {
-        $null = [SNNative]::ShowWindow($h, 9)
-        $null = [SNNative]::SetForegroundWindow($h)
-        return
-      }
+    if (-not $script:mainWindow -or $script:mainWindow.IsDisposed) {
+      $script:mainWindow = New-NotesWindow "$($script:base)/?view=main"
+      $script:mainWindow.Show()
+      Set-ExcludeFromCapture $script:mainWindow.Handle
+    } elseif ($script:mainWindow.WindowState -eq [System.Windows.Forms.FormWindowState]::Minimized) {
+      $null = [SNNative]::ShowWindow($script:mainWindow.Handle, 9)
     }
-  } catch { }
-  $url = "$($script:base)/?view=main"
-  $pf86 = ${env:ProgramFiles(x86)}
-  $pf = $env:ProgramFiles
-  $candidates = @()
-  if ($pf86) { $candidates += (Join-Path $pf86 'Microsoft\Edge\Application\msedge.exe') }
-  if ($pf) { $candidates += (Join-Path $pf 'Microsoft\Edge\Application\msedge.exe') }
-  $edge = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-  if ($edge) {
-    Start-Process -FilePath $edge -ArgumentList "--app=$url", '--window-size=1280,840' | Out-Null
-  } else {
-    Start-Process $url | Out-Null
+    $script:mainWindow.Activate()
+  } catch {
+    Show-BubbleError ("无法打开笔记库：" + $_.Exception.Message)
+    Write-Json @{ event = 'main-window-error'; message = $_.Exception.Message }
   }
 }
 
@@ -1681,6 +1673,7 @@ $script:dotTimer.Stop()
 $script:tray.Visible = $false
 $script:tray.Dispose()
 $script:bubble.Dispose()
+if ($script:mainWindow) { $script:mainWindow.Dispose() }
 try { $script:caption.Dispose() } catch { }
 try { if ($script:captionFont) { $script:captionFont.Dispose() } } catch { }
 $mini.Dispose()

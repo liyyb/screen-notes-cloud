@@ -2,17 +2,10 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { migrate, currentVersion } from './migrate.mjs';
+import { migrate, currentVersion, segmentForFts } from './migrate.mjs';
 import { ContractError } from '../contracts/errors.mjs';
 
-const CJK = /[\u3400-\u9fff\u3040-\u30ff]/g;
-
-export function segmentForFts(text) {
-  return String(text ?? '')
-    .replace(CJK, (c) => ` ${c} `)
-    .replace(/[\s]+/g, ' ')
-    .trim();
-}
+export { segmentForFts };
 
 function buildMatch(query) {
   const seg = segmentForFts(query);
@@ -99,7 +92,7 @@ function openWritable(dbPath) {
   }
   throw new Error(
     `笔记数据库无法写入：${dbPath}（${lastErr?.message ?? 'unknown'}）。` +
-    '请确认没有其他屏幕笔记实例正在运行；若仍失败，退出后删除 data/notes.sqlite3-wal 与 data/notes.sqlite3-shm 再启动。'
+    '请确认数据目录可写，并退出占用该目录的实例后重试。恢复时请保留数据库及其 WAL、SHM 文件。'
   );
 }
 
@@ -170,11 +163,25 @@ export class NoteStore {
     };
   }
 
-  syncFts(id, title, summary, ocrText) {
+  transaction(action) {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = action();
+      this.db.exec('COMMIT');
+      return result;
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  syncFts(id) {
+    const note = this.get(id);
+    const body = note.kind === 'transcript' ? note.transcript_text : note.ocr_text;
     this.stmts.ftsDelete.run(id);
     this.stmts.ftsInsert.run(
-      id, title, summary, ocrText,
-      segmentForFts(`${title} ${summary} ${ocrText}`)
+      id, note.title, note.summary, body,
+      segmentForFts(`${note.title} ${note.summary} ${body}`)
     );
   }
 
@@ -188,17 +195,18 @@ export class NoteStore {
       note.ocr_hash ?? '', note.merge_key ?? '', note.section ?? '收集箱'
     );
     const id = Number(r.lastInsertRowid);
-    this.syncFts(id, note.title, note.summary, note.ocr_text);
+    this.syncFts(id);
     return this.get(id);
   }
 
   get(id) { return rowToNote(this.stmts.get.get(id)); }
 
   update(id, title, summary) {
-    this.stmts.update.run(title, summary, Date.now(), id);
-    const n = this.get(id);
-    if (n) this.syncFts(id, n.title, n.summary, n.ocr_text);
-    return n;
+    return this.transaction(() => {
+      if (!this.stmts.update.run(title, summary, Date.now(), id).changes) return null;
+      this.syncFts(id);
+      return this.get(id);
+    });
   }
 
   replaceContent(id, patch) {
@@ -211,7 +219,7 @@ export class NoteStore {
       patch.provider ?? n.provider, patch.parse_ok === false ? 0 : 1,
       patch.ocr_hash ?? n.ocr_hash, id
     );
-    this.syncFts(id, patch.title, patch.summary, patch.ocr_text);
+    this.syncFts(id);
     return this.get(id);
   }
 
@@ -433,13 +441,13 @@ export class NoteStore {
       );
       noteId = Number(this.db.prepare('SELECT last_insert_rowid() AS id').get().id);
       this.db.prepare('UPDATE drafts SET status = ?, committed_note_id = ?, updated_at = ? WHERE id = ?').run('committed', noteId, Date.now(), id);
+      this.syncFts(noteId);
+      this.transferDraftAssets(id, noteId);
       this.db.exec('COMMIT');
     } catch (e) {
       this.db.exec('ROLLBACK');
       throw e;
     }
-    this.syncFts(noteId, '', brief.display ?? '', draft.ocr_clean || draft.ocr_raw || '');
-    this.transferDraftAssets(id, noteId);
     return this.get(noteId);
   }
 

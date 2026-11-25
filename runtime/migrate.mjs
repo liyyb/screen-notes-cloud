@@ -11,11 +11,19 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { ContractError } from '../contracts/errors.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = path.resolve(here, '..', 'migrations');
+
+export function segmentForFts(text) {
+  return String(text ?? '')
+    .replace(/[\u3400-\u9fff\u3040-\u30ff]/g, (c) => ` ${c} `)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 /** 列出按版本号升序的迁移文件。 */
 export function listMigrations(dir = MIGRATIONS_DIR) {
@@ -46,6 +54,7 @@ export function currentVersion(db) {
  * @returns {string[]} 已应用（含跳过）的迁移文件名
  */
 export function migrate(db, dataDir) {
+  db.function('sn_segment_fts', { deterministic: true }, segmentForFts);
   const from = currentVersion(db);
   const migrations = listMigrations();
   const applied = [];
@@ -75,8 +84,12 @@ function backup(db, dataDir, toVersion) {
   const dbPath = path.join(dataDir, 'notes.sqlite3');
   if (!fs.existsSync(dbPath)) return;
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  const dest = path.join(backupsDir, `notes.sqlite3.pre-v${toVersion}-${ts}.bak`);
-  // 使用 SQLite 在线备份语义：确保 WAL 已 checkpoint 后复制。
-  db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
-  fs.copyFileSync(dbPath, dest);
+  const dest = path.join(backupsDir, `notes.sqlite3.pre-v${toVersion}-${ts}-${randomUUID()}.bak`);
+  const pending = dest + '.partial';
+  try {
+    db.prepare('VACUUM INTO ?').run(pending);
+    fs.renameSync(pending, dest);
+  } finally {
+    fs.rmSync(pending, { force: true });
+  }
 }
